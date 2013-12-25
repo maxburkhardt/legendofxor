@@ -3,11 +3,12 @@
 // the window
 static Window *window;
 
-// Constants for damage types & resistances
+// Constants for damage types, resistances, and stats
 static const int NO_RESISTANCES = 0;
 static const int SWORD_DAMAGE = 1;
 static const int MAGIC_DAMAGE = 2;
 static const int BOW_DAMAGE = 4;
+static const int HEALTH_STAT = 8;
 
 // Constants for game states
 static const int BATTLE = 0;
@@ -42,11 +43,26 @@ typedef struct {
     int damage;
     uint32_t sprite;
     const char* name;
+    int stat_boost;
 } Monster;
 
 static Monster tentacle_mage;
 static Monster ent;
 static Monster horned_guard;
+
+// Player stats
+static int player_max_health;
+static int player_sword_damage;
+static int player_magic_damage;
+static int player_bow_damage;
+
+// Persistent storage keys
+static const uint32_t PLAYER_MAX_HEALTH_KEY = 0;
+static const uint32_t PLAYER_SWORD_DAMAGE_KEY = 1;
+static const uint32_t PLAYER_MAGIC_DAMAGE_KEY = 2;
+static const uint32_t PLAYER_BOW_DAMAGE_KEY = 3;
+static const uint32_t TRAVEL_PROGRESS_KEY = 4;
+
 
 // this holds a pointer to the monster currently being fought
 static Monster *current_battle;
@@ -54,7 +70,7 @@ static Monster *current_battle;
 static int current_monster_health = 0;
 // This holds the current player health
 // TODO this will change when stats are implemented
-static int current_player_health = 10;
+static int current_player_health;
 static char player_health_str[3];
 // This int represents what sort of mode the game is in right now
 static int state = 2;
@@ -76,11 +92,45 @@ Monster* random_encounter() {
     }
 }
 
+void increase_stats(int attribute) {
+    if (attribute == HEALTH_STAT) {
+        player_max_health += 1;
+        persist_write_int(PLAYER_MAX_HEALTH_KEY, player_max_health);
+    } else if (attribute == SWORD_DAMAGE) {
+        player_sword_damage += 1;
+        persist_write_int(PLAYER_SWORD_DAMAGE_KEY, player_sword_damage); 
+    } else if (attribute == MAGIC_DAMAGE) {
+        player_magic_damage += 1;
+        persist_write_int(PLAYER_MAGIC_DAMAGE_KEY, player_magic_damage); 
+    } else if (attribute == BOW_DAMAGE) {
+        player_bow_damage += 1;
+        persist_write_int(PLAYER_BOW_DAMAGE_KEY, player_bow_damage); 
+    }
+}
+
+void clear_stats() {
+    persist_delete(PLAYER_MAX_HEALTH_KEY);
+    persist_delete(PLAYER_SWORD_DAMAGE_KEY);
+    persist_delete(PLAYER_MAGIC_DAMAGE_KEY);
+    persist_delete(PLAYER_BOW_DAMAGE_KEY);
+}
+
 void attack(int type) {
+    int damage = 0;
+    if (type == SWORD_DAMAGE) {
+        damage = player_sword_damage;
+    } else if (type == MAGIC_DAMAGE) {
+        damage = player_magic_damage;
+    } else if (type == BOW_DAMAGE) {
+        damage = player_bow_damage;
+    }
     if ((current_battle->resistances & type) == 0) {
-        current_monster_health -= 1;
+        current_monster_health -= damage;
+    } else {
+        current_monster_health -= (damage / 5);
     }
     if (current_monster_health <= 0) {
+        increase_stats(current_battle->stat_boost);
         current_battle = random_encounter();
         current_monster_health = current_battle->health;
         text_layer_set_text(enemy_name, current_battle->name);
@@ -90,6 +140,7 @@ void attack(int type) {
         if (rng() < current_battle->hit_chance) {
             current_player_health -= current_battle->damage;
             if (current_player_health <= 0) {
+                clear_stats();
                 state_transition(DEATH);
                 return;
             }
@@ -141,6 +192,24 @@ static void click_config_provider(void *context) {
   window_single_click_subscribe(BUTTON_ID_DOWN, down_click_handler);
 }
 
+void stats_load() {
+    if (persist_exists(PLAYER_MAX_HEALTH_KEY)) {
+        player_max_health = persist_read_int(PLAYER_MAX_HEALTH_KEY);
+        player_sword_damage = persist_read_int(PLAYER_SWORD_DAMAGE_KEY);
+        player_magic_damage = persist_read_int(PLAYER_MAGIC_DAMAGE_KEY);
+        player_bow_damage = persist_read_int(PLAYER_BOW_DAMAGE_KEY);
+    } else {
+        player_max_health = 10;
+        player_sword_damage = 1;
+        player_magic_damage = 1;
+        player_bow_damage = 1;
+        persist_write_int(PLAYER_MAX_HEALTH_KEY, player_max_health);
+        persist_write_int(PLAYER_SWORD_DAMAGE_KEY, player_sword_damage);
+        persist_write_int(PLAYER_MAGIC_DAMAGE_KEY, player_magic_damage);
+        persist_write_int(PLAYER_BOW_DAMAGE_KEY, player_bow_damage);
+    }
+}
+
 static void monster_load() { 
     // Tentacle Mage
     tentacle_mage.health = 5;
@@ -149,6 +218,7 @@ static void monster_load() {
     tentacle_mage.damage = 2;
     tentacle_mage.sprite = RESOURCE_ID_MONSTER_TENTACLE_MAGE;
     tentacle_mage.name = "Tentacle Mage";
+    tentacle_mage.stat_boost = MAGIC_DAMAGE;
     
     // Ent
     ent.health = 10;
@@ -157,6 +227,7 @@ static void monster_load() {
     ent.damage = 1;
     ent.sprite = RESOURCE_ID_MONSTER_ENT;
     ent.name = "Ent";
+    ent.stat_boost = MAGIC_DAMAGE;
 
     // Horned Guard
     horned_guard.health = 7;
@@ -165,6 +236,7 @@ static void monster_load() {
     horned_guard.damage = 1;
     horned_guard.sprite = RESOURCE_ID_MONSTER_HORNED_GUARD;
     horned_guard.name = "Horned Guard";
+    horned_guard.stat_boost = SWORD_DAMAGE;
 }
 
 void monster_health_update(Layer *layer, GContext* ctx) {
@@ -177,6 +249,7 @@ static void battle_load(Window *window) {
   Layer *window_layer = window_get_root_layer(window);
   current_battle = random_encounter();
   current_monster_health = current_battle->health;
+  current_player_health = player_max_health;
 
   enemy_name = text_layer_create((GRect) { .origin = { 10, 10 }, .size = { 100, 20 } });
   text_layer_set_text(enemy_name, current_battle->name);
@@ -316,6 +389,7 @@ static void window_unload(Window *window) {
 
 static void init(void) {
   monster_load();
+  stats_load();
   window = window_create();
   window_set_click_config_provider(window, click_config_provider);
   window_set_window_handlers(window, (WindowHandlers) {
