@@ -1,0 +1,59 @@
+{
+  "uuid": "e35e0f09-d760-4592-ae0d-cc32fae0fe6d",
+  "shortName": "Legend of Xor",
+  "longName": "The Legend of Xor",
+  "companyName": "Burkhardt Industries",
+  "versionCode": 1,
+  "versionLabel": "1.0.0",
+  "watchapp": {
+    "watchface": false
+  },
+  "appKeys": {
+    "dummy": 0
+  },
+  "resources": {
+    "media": [
+        {
+        "type":"font",
+        "name":"STONECROSS_20",
+        "file":"fonts/stonecross.ttf"
+        },
+        {
+        "menuIcon":true,
+        "type":"png",
+        "name":"IMAGE_MENU_ICON",
+        "file":"ui/icon.png"
+        },
+        {
+        "type":"png",
+        "name":"SWORD_ICON",
+        "file":"ui/sword.png"
+        },
+        {
+        "type":"png",
+        "name":"MAGIC_ICON",
+        "file":"ui/magic.png"
+        },
+        {
+        "type":"png",
+        "name":"BOW_ICON",
+        "file":"ui/bow.png"
+        },
+        {
+        "type":"png",
+        "name":"MONSTER_TENTACLE_MAGE",
+        "file":"monsters/tentacle_mage.png"
+        },
+        {
+        "type":"png",
+        "name":"MONSTER_HORNED_GUARD",
+        "file":"monsters/horned_guard.png"
+        },
+        {
+        "type":"png",
+        "name":"MONSTER_ENT",
+        "file":"monsters/ent.png"
+        }
+    ]
+  }
+}
