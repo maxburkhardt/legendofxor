@@ -127,7 +127,7 @@ void attack(int type) {
     if ((current_battle->resistances & type) == 0) {
         current_monster_health -= damage;
     } else {
-        current_monster_health -= (damage / 5);
+        current_monster_health -= (int)((float) damage / 5.0);
     }
     if (current_monster_health <= 0) {
         increase_stats(current_battle->stat_boost);
