@@ -42,8 +42,8 @@ typedef struct {
     float hit_chance;
     int damage;
     uint32_t sprite;
-    const char* name;
     int stat_boost;
+    const char* name;
 } Monster;
 
 static Monster tentacle_mage;
@@ -58,10 +58,11 @@ static int player_bow_damage;
 
 // Persistent storage keys
 static const uint32_t PLAYER_MAX_HEALTH_KEY = 0;
-static const uint32_t PLAYER_SWORD_DAMAGE_KEY = 1;
-static const uint32_t PLAYER_MAGIC_DAMAGE_KEY = 2;
-static const uint32_t PLAYER_BOW_DAMAGE_KEY = 3;
-static const uint32_t TRAVEL_PROGRESS_KEY = 4;
+static const uint32_t PLAYER_CURRENT_HEALTH_KEY = 1;
+static const uint32_t PLAYER_SWORD_DAMAGE_KEY = 2;
+static const uint32_t PLAYER_MAGIC_DAMAGE_KEY = 3;
+static const uint32_t PLAYER_BOW_DAMAGE_KEY = 4;
+static const uint32_t TRAVEL_PROGRESS_KEY = 5;
 
 
 // this holds a pointer to the monster currently being fought
@@ -75,10 +76,23 @@ static char player_health_str[3];
 // This int represents what sort of mode the game is in right now
 static int state = 2;
 
+static AppTimer *travel_timer;
+static AccelData accel_prev;
+static AccelData accel_current;
+// TODO pull this out of persistent storage
+static int movement_total = 0;
+
 void state_transition(int new_state);
 
 float rng() {
     return (float) rand() / (float) RAND_MAX;
+}
+
+int custom_abs(int value) {
+    uint32_t temp = value >> 31;     // make a mask of the sign bit
+    value ^= temp;                   // toggle the bits if value is negative
+    value += temp & 1;               // add one if value was negative
+    return value;
 }
 
 Monster* random_encounter() {
@@ -95,7 +109,9 @@ Monster* random_encounter() {
 void increase_stats(int attribute) {
     if (attribute == HEALTH_STAT) {
         player_max_health += 1;
+        current_player_health += 1;
         persist_write_int(PLAYER_MAX_HEALTH_KEY, player_max_health);
+        persist_write_int(PLAYER_CURRENT_HEALTH_KEY, current_player_health);
     } else if (attribute == SWORD_DAMAGE) {
         player_sword_damage += 1;
         persist_write_int(PLAYER_SWORD_DAMAGE_KEY, player_sword_damage); 
@@ -110,6 +126,7 @@ void increase_stats(int attribute) {
 
 void clear_stats() {
     persist_delete(PLAYER_MAX_HEALTH_KEY);
+    persist_delete(PLAYER_CURRENT_HEALTH_KEY);
     persist_delete(PLAYER_SWORD_DAMAGE_KEY);
     persist_delete(PLAYER_MAGIC_DAMAGE_KEY);
     persist_delete(PLAYER_BOW_DAMAGE_KEY);
@@ -131,11 +148,12 @@ void attack(int type) {
     }
     if (current_monster_health <= 0) {
         increase_stats(current_battle->stat_boost);
-        current_battle = random_encounter();
-        current_monster_health = current_battle->health;
-        text_layer_set_text(enemy_name, current_battle->name);
-        monster_sprite = gbitmap_create_with_resource(current_battle->sprite);
-        bitmap_layer_set_bitmap(monster_layer, monster_sprite);
+        state_transition(TRAVEL);
+        // current_battle = random_encounter();
+        // current_monster_health = current_battle->health;
+        // text_layer_set_text(enemy_name, current_battle->name);
+        // monster_sprite = gbitmap_create_with_resource(current_battle->sprite);
+        // bitmap_layer_set_bitmap(monster_layer, monster_sprite);
     } else {
         if (rng() < current_battle->hit_chance) {
             current_player_health -= current_battle->damage;
@@ -144,6 +162,7 @@ void attack(int type) {
                 state_transition(DEATH);
                 return;
             }
+            persist_write_int(PLAYER_CURRENT_HEALTH_KEY, current_player_health);
             snprintf(player_health_str, 3, "%d", current_player_health);
             text_layer_set_text(player_health, player_health_str);
         }
@@ -157,7 +176,7 @@ static void select_click_handler(ClickRecognizerRef recognizer, void *context) {
     } else if (state == DEATH) {
         state_transition(WELCOME);
     } else if (state == WELCOME) {
-        state_transition(BATTLE);
+        state_transition(TRAVEL);
     }
 
 }
@@ -168,7 +187,7 @@ static void up_click_handler(ClickRecognizerRef recognizer, void *context) {
     } else if (state == DEATH) {
         state_transition(WELCOME);
     } else if (state == WELCOME) {
-        state_transition(BATTLE);
+        state_transition(TRAVEL);
     }
 
 
@@ -180,7 +199,7 @@ static void down_click_handler(ClickRecognizerRef recognizer, void *context) {
     } else if (state == DEATH) {
         state_transition(WELCOME);
     } else if (state == WELCOME) {
-        state_transition(BATTLE);
+        state_transition(TRAVEL);
     }
 
 
@@ -192,18 +211,46 @@ static void click_config_provider(void *context) {
   window_single_click_subscribe(BUTTON_ID_DOWN, down_click_handler);
 }
 
+static void handle_accel(AccelData *accel_data, uint32_t num_samples) { 
+    // do nothing                                                       
+}                                                                       
+
+static void query_accel(void *context) {
+    accel_prev = accel_current;
+    accel_service_peek(&accel_current);
+    int sum = 0;
+    sum += accel_current.x - accel_prev.x;
+    sum += accel_current.y - accel_prev.y;
+    sum += accel_current.z - accel_prev.z;
+    movement_total += custom_abs(sum);
+    APP_LOG(APP_LOG_LEVEL_DEBUG, "Adding %d to total, total is now %d.", custom_abs(sum), movement_total);
+    if (movement_total > 10000) {
+        movement_total = 0;
+        state_transition(BATTLE);
+    }
+    //sum = (int)((float)sum/300.0);
+    //APP_LOG(APP_LOG_LEVEL_DEBUG, "Sum was %d for this sample.", sum);
+    //APP_LOG(APP_LOG_LEVEL_DEBUG, "X: %d, Y: %d, Z: %d", data.x, data.y, data.z);
+
+    travel_timer = app_timer_register(3000, query_accel, NULL);
+}
+
 void stats_load() {
     if (persist_exists(PLAYER_MAX_HEALTH_KEY)) {
         player_max_health = persist_read_int(PLAYER_MAX_HEALTH_KEY);
+        current_player_health = persist_read_int(PLAYER_CURRENT_HEALTH_KEY);
         player_sword_damage = persist_read_int(PLAYER_SWORD_DAMAGE_KEY);
         player_magic_damage = persist_read_int(PLAYER_MAGIC_DAMAGE_KEY);
         player_bow_damage = persist_read_int(PLAYER_BOW_DAMAGE_KEY);
     } else {
+        APP_LOG(APP_LOG_LEVEL_DEBUG, "Stats did not exist, resetting.");
         player_max_health = 10;
+        current_player_health = player_max_health;
         player_sword_damage = 1;
         player_magic_damage = 1;
         player_bow_damage = 1;
         persist_write_int(PLAYER_MAX_HEALTH_KEY, player_max_health);
+        persist_write_int(PLAYER_CURRENT_HEALTH_KEY, player_max_health);
         persist_write_int(PLAYER_SWORD_DAMAGE_KEY, player_sword_damage);
         persist_write_int(PLAYER_MAGIC_DAMAGE_KEY, player_magic_damage);
         persist_write_int(PLAYER_BOW_DAMAGE_KEY, player_bow_damage);
@@ -249,7 +296,6 @@ static void battle_load(Window *window) {
   Layer *window_layer = window_get_root_layer(window);
   current_battle = random_encounter();
   current_monster_health = current_battle->health;
-  current_player_health = player_max_health;
 
   enemy_name = text_layer_create((GRect) { .origin = { 10, 10 }, .size = { 100, 20 } });
   text_layer_set_text(enemy_name, current_battle->name);
@@ -342,11 +388,35 @@ static void welcome_load(Window *window) {
   text_layer_set_text(press_a_key, "Press a button");
   text_layer_set_text_alignment(press_a_key, GTextAlignmentCenter);
   layer_add_child(window_layer, text_layer_get_layer(press_a_key)); 
+
+  // this is so that when we restart, player variables are set back to the baseline
+  stats_load();
 }
 
 static void welcome_unload(Window *window) {
   text_layer_destroy(welcome_text); 
   text_layer_destroy(press_a_key); 
+}
+
+static void travel_load(Window *window) {
+  Layer *window_layer = window_get_root_layer(window);
+  GRect bounds = layer_get_bounds(window_layer);
+  welcome_text = text_layer_create((GRect) { .origin = { 0, 30 }, .size = { bounds.size.w, 90 } });
+  text_layer_set_text(welcome_text, "TRAVELING");
+  text_layer_set_text_alignment(welcome_text, GTextAlignmentCenter);
+  text_layer_set_font(welcome_text, fonts_load_custom_font(resource_get_handle(RESOURCE_ID_STONECROSS_20)));
+  layer_add_child(window_layer, text_layer_get_layer(welcome_text)); 
+
+  accel_data_service_subscribe(0, handle_accel);
+  accel_service_peek(&accel_prev);
+  travel_timer = app_timer_register(3000, query_accel, NULL);
+}
+
+static void travel_unload(Window *window) {
+  text_layer_destroy(welcome_text); 
+
+  accel_data_service_unsubscribe();
+  app_timer_cancel(travel_timer);
 }
 
 void state_transition(int new_state) {
@@ -356,6 +426,8 @@ void state_transition(int new_state) {
         death_unload(window);
     } else if (state == WELCOME) {
         welcome_unload(window);
+    } else if (state == TRAVEL) {
+        travel_unload(window);
     }
     state = new_state;
     if (state == BATTLE) {
@@ -364,6 +436,8 @@ void state_transition(int new_state) {
         death_load(window);
     } else if (state == WELCOME) {
         welcome_load(window);
+    } else if (state == TRAVEL) {
+        travel_load(window);
     }
 }
 
@@ -374,6 +448,8 @@ static void window_load(Window *window) {
       death_load(window);
   } else if (state == WELCOME) {
       welcome_load(window);
+  } else if (state == TRAVEL) {
+      travel_load(window);
   }
 }
 
@@ -384,6 +460,8 @@ static void window_unload(Window *window) {
       death_unload(window);
   } else if (state == WELCOME) {
       welcome_unload(window);
+  } else if (state == TRAVEL) {
+      travel_unload(window);
   }
 }
 
