@@ -149,11 +149,6 @@ void attack(int type) {
     if (current_monster_health <= 0) {
         increase_stats(current_battle->stat_boost);
         state_transition(TRAVEL);
-        // current_battle = random_encounter();
-        // current_monster_health = current_battle->health;
-        // text_layer_set_text(enemy_name, current_battle->name);
-        // monster_sprite = gbitmap_create_with_resource(current_battle->sprite);
-        // bitmap_layer_set_bitmap(monster_layer, monster_sprite);
     } else {
         if (rng() < current_battle->hit_chance) {
             current_player_health -= current_battle->damage;
@@ -228,9 +223,6 @@ static void query_accel(void *context) {
         movement_total = 0;
         state_transition(BATTLE);
     }
-    //sum = (int)((float)sum/300.0);
-    //APP_LOG(APP_LOG_LEVEL_DEBUG, "Sum was %d for this sample.", sum);
-    //APP_LOG(APP_LOG_LEVEL_DEBUG, "X: %d, Y: %d, Z: %d", data.x, data.y, data.z);
 
     travel_timer = app_timer_register(3000, query_accel, NULL);
 }
