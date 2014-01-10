@@ -174,6 +174,7 @@ void attack(int type) {
                 state_transition(DEATH);
                 return;
             }
+            vibes_short_pulse();
             persist_write_int(PLAYER_CURRENT_HEALTH_KEY, current_player_health);
             snprintf(player_health_str, 3, "%d", current_player_health);
             text_layer_set_text(player_health, player_health_str);
@@ -238,6 +239,7 @@ static void query_accel(void *context) {
     APP_LOG(APP_LOG_LEVEL_DEBUG, "Adding %d to total, total is now %d.", custom_abs(sum), movement_total);
     if (movement_total > 10000) {
         movement_total = 0;
+        vibes_double_pulse();
         state_transition(BATTLE);
     }
 
@@ -386,6 +388,8 @@ static void death_load(Window *window) {
   text_layer_set_text(press_a_key, "Press a button");
   text_layer_set_text_alignment(press_a_key, GTextAlignmentCenter);
   layer_add_child(window_layer, text_layer_get_layer(press_a_key)); 
+
+  vibes_long_pulse();
 }
 
 static void death_unload(Window *window) {
