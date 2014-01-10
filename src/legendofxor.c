@@ -4,17 +4,28 @@
 static Window *window;
 
 // Constants for damage types, resistances, and stats
-static const int NO_RESISTANCES = 0;
-static const int SWORD_DAMAGE = 1;
-static const int MAGIC_DAMAGE = 2;
-static const int BOW_DAMAGE = 4;
-static const int HEALTH_STAT = 8;
+#define NO_RESISTANCES 0
+#define SWORD_DAMAGE 1
+#define MAGIC_DAMAGE 2
+#define BOW_DAMAGE 4
+#define HEALTH_STAT 8
 
 // Constants for game states
-static const int BATTLE = 0;
-static const int TRAVEL = 1;
-static const int WELCOME = 2;
-static const int DEATH = 3;
+#define BATTLE 0
+#define TRAVEL 1
+#define WELCOME 2
+#define DEATH 3
+
+// Persistent storage keys
+#define PLAYER_MAX_HEALTH_KEY 0
+#define PLAYER_CURRENT_HEALTH_KEY 1
+#define PLAYER_SWORD_DAMAGE_KEY 2
+#define PLAYER_MAGIC_DAMAGE_KEY 3
+#define PLAYER_BOW_DAMAGE_KEY 4
+#define TRAVEL_PROGRESS_KEY 5
+#define MONSTER_INDEX_KEY 6
+#define MONSTER_CURRENT_HEALTH_KEY 7
+#define STATE_KEY 8
 
 // Text Fields
 static TextLayer *enemy_name;
@@ -49,20 +60,13 @@ typedef struct {
 static Monster tentacle_mage;
 static Monster ent;
 static Monster horned_guard;
+static Monster* monster_index[3];
 
 // Player stats
 static int player_max_health;
 static int player_sword_damage;
 static int player_magic_damage;
 static int player_bow_damage;
-
-// Persistent storage keys
-static const uint32_t PLAYER_MAX_HEALTH_KEY = 0;
-static const uint32_t PLAYER_CURRENT_HEALTH_KEY = 1;
-static const uint32_t PLAYER_SWORD_DAMAGE_KEY = 2;
-static const uint32_t PLAYER_MAGIC_DAMAGE_KEY = 3;
-static const uint32_t PLAYER_BOW_DAMAGE_KEY = 4;
-static const uint32_t TRAVEL_PROGRESS_KEY = 5;
 
 
 // this holds a pointer to the monster currently being fought
@@ -74,7 +78,8 @@ static int current_monster_health = 0;
 static int current_player_health;
 static char player_health_str[3];
 // This int represents what sort of mode the game is in right now
-static int state = 2;
+// This will be overwritten at launch
+static int state = WELCOME;
 
 static AppTimer *travel_timer;
 static AccelData accel_prev;
@@ -96,6 +101,11 @@ int custom_abs(int value) {
 }
 
 Monster* random_encounter() {
+    int index = rand() % 3;
+    persist_write_int(MONSTER_INDEX_KEY, index);
+    persist_write_int(MONSTER_CURRENT_HEALTH_KEY, monster_index[index]->health);
+    return monster_index[index];
+    /*
     float roll = rng();
     if (roll < 0.33) {
         return &ent;
@@ -104,6 +114,7 @@ Monster* random_encounter() {
     } else {
         return &horned_guard;
     }
+    */
 }
 
 void increase_stats(int attribute) {
@@ -130,6 +141,9 @@ void clear_stats() {
     persist_delete(PLAYER_SWORD_DAMAGE_KEY);
     persist_delete(PLAYER_MAGIC_DAMAGE_KEY);
     persist_delete(PLAYER_BOW_DAMAGE_KEY);
+    persist_delete(MONSTER_INDEX_KEY);
+    persist_delete(MONSTER_CURRENT_HEALTH_KEY);
+    persist_delete(STATE_KEY);
 }
 
 void attack(int type) {
@@ -148,8 +162,11 @@ void attack(int type) {
     }
     if (current_monster_health <= 0) {
         increase_stats(current_battle->stat_boost);
+        persist_delete(MONSTER_CURRENT_HEALTH_KEY);
+        persist_delete(MONSTER_INDEX_KEY);
         state_transition(TRAVEL);
     } else {
+        persist_write_int(MONSTER_CURRENT_HEALTH_KEY, current_monster_health);
         if (rng() < current_battle->hit_chance) {
             current_player_health -= current_battle->damage;
             if (current_player_health <= 0) {
@@ -276,6 +293,10 @@ static void monster_load() {
     horned_guard.sprite = RESOURCE_ID_MONSTER_HORNED_GUARD;
     horned_guard.name = "Horned Guard";
     horned_guard.stat_boost = SWORD_DAMAGE;
+
+    monster_index[0] = &tentacle_mage;
+    monster_index[1] = &ent;
+    monster_index[2] = &horned_guard;
 }
 
 void monster_health_update(Layer *layer, GContext* ctx) {
@@ -286,8 +307,13 @@ void monster_health_update(Layer *layer, GContext* ctx) {
 
 static void battle_load(Window *window) {
   Layer *window_layer = window_get_root_layer(window);
-  current_battle = random_encounter();
-  current_monster_health = current_battle->health;
+  if (persist_exists(MONSTER_CURRENT_HEALTH_KEY) && persist_exists(MONSTER_INDEX_KEY)) {
+      current_battle = monster_index[persist_read_int(MONSTER_INDEX_KEY)]; 
+      current_monster_health = persist_read_int(MONSTER_CURRENT_HEALTH_KEY);
+  } else {
+      current_battle = random_encounter();
+      current_monster_health = current_battle->health;
+  }
 
   enemy_name = text_layer_create((GRect) { .origin = { 10, 10 }, .size = { 100, 20 } });
   text_layer_set_text(enemy_name, current_battle->name);
@@ -422,6 +448,8 @@ void state_transition(int new_state) {
         travel_unload(window);
     }
     state = new_state;
+    persist_write_int(STATE_KEY, state);
+    APP_LOG(APP_LOG_LEVEL_DEBUG, "Wrote a state to persistent storage.");
     if (state == BATTLE) {
         battle_load(window);
     } else if (state == DEATH) {
@@ -434,6 +462,11 @@ void state_transition(int new_state) {
 }
 
 static void window_load(Window *window) {
+  if (persist_exists(STATE_KEY)) {
+      state = persist_read_int(STATE_KEY);
+  } else {
+      state = WELCOME;
+  }
   if (state == BATTLE) {
       battle_load(window);
   } else if (state == DEATH) {
@@ -477,7 +510,12 @@ static void deinit(void) {
 int main(void) {
   init();
 
-  APP_LOG(APP_LOG_LEVEL_DEBUG, "Done initializing, pushed window: %p", window);
+  if (persist_exists(STATE_KEY)) {
+      APP_LOG(APP_LOG_LEVEL_DEBUG, "Saved state is %d.", (int)persist_read_int(STATE_KEY));
+  } else {
+      APP_LOG(APP_LOG_LEVEL_DEBUG, "No saved state found.");
+  }
+
 
   app_event_loop();
   deinit();
