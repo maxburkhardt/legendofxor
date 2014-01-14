@@ -27,6 +27,9 @@ static Window *window;
 #define MONSTER_CURRENT_HEALTH_KEY 7
 #define STATE_KEY 8
 
+// How frequently random encounters should happen
+#define ENCOUNTER_FREQUENCY 70000
+
 // Text Fields
 static TextLayer *enemy_name;
 static TextLayer *player_health_label;
@@ -236,8 +239,8 @@ static void query_accel(void *context) {
     sum += accel_current.y - accel_prev.y;
     sum += accel_current.z - accel_prev.z;
     movement_total += custom_abs(sum);
-    APP_LOG(APP_LOG_LEVEL_DEBUG, "Adding %d to total, total is now %d.", custom_abs(sum), movement_total);
-    if (movement_total > 10000) {
+    //APP_LOG(APP_LOG_LEVEL_DEBUG, "Adding %d to total, total is now %d.", custom_abs(sum), movement_total);
+    if (movement_total > ENCOUNTER_FREQUENCY) {
         movement_total = 0;
         vibes_double_pulse();
         state_transition(BATTLE);
@@ -254,7 +257,7 @@ void stats_load() {
         player_magic_damage = persist_read_int(PLAYER_MAGIC_DAMAGE_KEY);
         player_bow_damage = persist_read_int(PLAYER_BOW_DAMAGE_KEY);
     } else {
-        APP_LOG(APP_LOG_LEVEL_DEBUG, "Stats did not exist, resetting.");
+        //APP_LOG(APP_LOG_LEVEL_DEBUG, "Stats did not exist, resetting.");
         player_max_health = 10;
         current_player_health = player_max_health;
         player_sword_damage = 1;
@@ -453,7 +456,7 @@ void state_transition(int new_state) {
     }
     state = new_state;
     persist_write_int(STATE_KEY, state);
-    APP_LOG(APP_LOG_LEVEL_DEBUG, "Wrote a state to persistent storage.");
+    //APP_LOG(APP_LOG_LEVEL_DEBUG, "Wrote a state to persistent storage.");
     if (state == BATTLE) {
         battle_load(window);
     } else if (state == DEATH) {
@@ -495,6 +498,7 @@ static void window_unload(Window *window) {
 }
 
 static void init(void) {
+  srand(time(NULL));
   monster_load();
   stats_load();
   window = window_create();
@@ -515,9 +519,9 @@ int main(void) {
   init();
 
   if (persist_exists(STATE_KEY)) {
-      APP_LOG(APP_LOG_LEVEL_DEBUG, "Saved state is %d.", (int)persist_read_int(STATE_KEY));
+      //APP_LOG(APP_LOG_LEVEL_DEBUG, "Saved state is %d.", (int)persist_read_int(STATE_KEY));
   } else {
-      APP_LOG(APP_LOG_LEVEL_DEBUG, "No saved state found.");
+      //APP_LOG(APP_LOG_LEVEL_DEBUG, "No saved state found.");
   }
 
 
