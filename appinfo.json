@@ -53,6 +53,46 @@
         "type":"png",
         "name":"MONSTER_ENT",
         "file":"monsters/ent.png"
+        },
+        {
+        "type":"png",
+        "name":"MONSTER_CENTAUR_SLAVER",
+        "file":"monsters/centaur_slaver.png"
+        },
+        {
+        "type":"png",
+        "name":"MONSTER_DISTURBED_WRAITH",
+        "file":"monsters/disturbed_wraith.png"
+        },
+        {
+        "type":"png",
+        "name":"MONSTER_EYE_FIEND",
+        "file":"monsters/eye_fiend.png"
+        },
+        {
+        "type":"png",
+        "name":"MONSTER_JUVENILE_WYRM",
+        "file":"monsters/juvenile_wyrm.png"
+        },
+        {
+        "type":"png",
+        "name":"MONSTER_NOXIOUS_SLIME",
+        "file":"monsters/noxious_slime.png"
+        },
+        {
+        "type":"png",
+        "name":"MONSTER_PIXEL_GOLEM",
+        "file":"monsters/pixel_golem.png"
+        },
+        {
+        "type":"png",
+        "name":"MONSTER_SMALL_FISH",
+        "file":"monsters/small_fish.png"
+        },
+        {
+        "type":"png",
+        "name":"MONSTER_VENGEFUL_DJINN",
+        "file":"monsters/vengeful_djinn.png"
         }
     ]
   }

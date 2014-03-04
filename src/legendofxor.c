@@ -63,7 +63,15 @@ typedef struct {
 static Monster tentacle_mage;
 static Monster ent;
 static Monster horned_guard;
-static Monster* monster_index[3];
+static Monster centaur_slaver;
+static Monster disturbed_wraith;
+static Monster eye_fiend;
+static Monster juvenile_wyrm;
+static Monster noxious_slime;
+static Monster pixel_golem;
+static Monster small_fish;
+static Monster vengeful_djinn;
+static Monster* monster_index[11];
 
 // Player stats
 static int player_max_health;
@@ -108,16 +116,6 @@ Monster* random_encounter() {
     persist_write_int(MONSTER_INDEX_KEY, index);
     persist_write_int(MONSTER_CURRENT_HEALTH_KEY, monster_index[index]->health);
     return monster_index[index];
-    /*
-    float roll = rng();
-    if (roll < 0.33) {
-        return &ent;
-    } else if (roll >= 0.33 && roll < 0.66) {
-        return &tentacle_mage;
-    } else {
-        return &horned_guard;
-    }
-    */
 }
 
 void increase_stats(int attribute) {
@@ -298,10 +296,89 @@ static void monster_load() {
     horned_guard.sprite = RESOURCE_ID_MONSTER_HORNED_GUARD;
     horned_guard.name = "Horned Guard";
     horned_guard.stat_boost = SWORD_DAMAGE;
+    
+    // Centaur Slaver
+    centaur_slaver.health = 8;
+    centaur_slaver.resistances = SWORD_DAMAGE;
+    centaur_slaver.hit_chance = 0.3;
+    centaur_slaver.damage = 1;
+    centaur_slaver.sprite = RESOURCE_ID_MONSTER_CENTAUR_SLAVER;
+    centaur_slaver.name = "Centaur Slaver";
+    centaur_slaver.stat_boost = SWORD_DAMAGE;
+
+    // Disturbed Wraith
+    disturbed_wraith.health = 3;
+    disturbed_wraith.resistances = SWORD_DAMAGE | BOW_DAMAGE;
+    disturbed_wraith.hit_chance = 0.6;
+    disturbed_wraith.damage = 1;
+    disturbed_wraith.sprite = RESOURCE_ID_MONSTER_DISTURBED_WRAITH;
+    disturbed_wraith.name = "Disturbed Wraith";
+    disturbed_wraith.stat_boost = MAGIC_DAMAGE;
+
+    // Eye Fiend
+    eye_fiend.health = 3;
+    eye_fiend.resistances = MAGIC_DAMAGE;
+    eye_fiend.hit_chance = 0.7;
+    eye_fiend.damage = 1;
+    eye_fiend.sprite = RESOURCE_ID_MONSTER_EYE_FIEND;
+    eye_fiend.name = "Eye Fiend";
+    eye_fiend.stat_boost = BOW_DAMAGE;
+
+    // Juvenile Wyrm
+    juvenile_wyrm.health = 7;
+    juvenile_wyrm.resistances = SWORD_DAMAGE | MAGIC_DAMAGE;
+    juvenile_wyrm.hit_chance = 0.5;
+    juvenile_wyrm.damage = 1;
+    juvenile_wyrm.sprite = RESOURCE_ID_MONSTER_JUVENILE_WYRM;
+    juvenile_wyrm.name = "Juvenile Wyrm";
+    juvenile_wyrm.stat_boost = BOW_DAMAGE;
+
+    // Noxious Slime
+    noxious_slime.health = 6;
+    noxious_slime.resistances = NO_RESISTANCES;
+    noxious_slime.hit_chance = 0.3;
+    noxious_slime.damage = 2;
+    noxious_slime.sprite = RESOURCE_ID_MONSTER_NOXIOUS_SLIME;
+    noxious_slime.name = "Noxious Slime";
+    noxious_slime.stat_boost = BOW_DAMAGE;
+
+    // Pixel Golem
+    pixel_golem.health = 7;
+    pixel_golem.resistances = MAGIC_DAMAGE;
+    pixel_golem.hit_chance = 0.5;
+    pixel_golem.damage = 1;
+    pixel_golem.sprite = RESOURCE_ID_MONSTER_PIXEL_GOLEM;
+    pixel_golem.name = "Pixel Golem";
+    pixel_golem.stat_boost = MAGIC_DAMAGE;
+
+    // Small Fish
+    small_fish.health = 2;
+    small_fish.resistances = NO_RESISTANCES;
+    small_fish.hit_chance = 0.1;
+    small_fish.damage = 4;
+    small_fish.sprite = RESOURCE_ID_MONSTER_SMALL_FISH;
+    small_fish.name = "Small Fish";
+    small_fish.stat_boost = BOW_DAMAGE;
+
+    // Vengeful Djinn
+    vengeful_djinn.health = 3;
+    vengeful_djinn.resistances = SWORD_DAMAGE;
+    vengeful_djinn.hit_chance = 0.3;
+    vengeful_djinn.damage = 3;
+    vengeful_djinn.sprite = RESOURCE_ID_MONSTER_VENGEFUL_DJINN;
+    vengeful_djinn.name = "Vengeful Djinn";
+    vengeful_djinn.stat_boost = BOW_DAMAGE;
 
     monster_index[0] = &tentacle_mage;
     monster_index[1] = &ent;
     monster_index[2] = &horned_guard;
+    monster_index[3] = &centaur_slaver;
+    monster_index[4] = &disturbed_wraith;
+    monster_index[5] = &eye_fiend;
+    monster_index[6] = &juvenile_wyrm;
+    monster_index[7] = &noxious_slime;
+    monster_index[8] = &pixel_golem;
+    monster_index[9] = &small_fish;
 }
 
 void monster_health_update(Layer *layer, GContext* ctx) {
