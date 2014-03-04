@@ -112,7 +112,7 @@ int custom_abs(int value) {
 }
 
 Monster* random_encounter() {
-    int index = rand() % 3;
+    int index = rand() % 11;
     persist_write_int(MONSTER_INDEX_KEY, index);
     persist_write_int(MONSTER_CURRENT_HEALTH_KEY, monster_index[index]->health);
     return monster_index[index];
